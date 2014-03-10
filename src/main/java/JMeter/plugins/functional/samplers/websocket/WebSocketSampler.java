@@ -20,14 +20,18 @@ import org.apache.jorphan.logging.LoggingManager;
 import org.apache.jorphan.util.JOrphanUtils;
 import org.apache.log.Logger;
 
-
 import java.io.UnsupportedEncodingException;
+import java.net.HttpCookie;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.CookieStore;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.apache.jmeter.testelement.TestStateListener;
+import org.apache.jmeter.threads.JMeterVariables;
+import org.eclipse.jetty.util.HttpCookieStore;
 import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.websocket.client.ClientUpgradeRequest;
 import org.eclipse.jetty.websocket.client.WebSocketClient;
@@ -83,6 +87,13 @@ public class WebSocketSampler extends AbstractSampler implements TestStateListen
         //Start WebSocket client thread and upgrage HTTP connection
         webSocketClient.start();
         ClientUpgradeRequest request = new ClientUpgradeRequest();
+        CookieStore cookies = getCookieStore(uri);
+        Iterator<HttpCookie> itr = cookies.getCookies().iterator();
+        while (itr.hasNext()) {
+            HttpCookie tmp = itr.next();
+            log.debug("Adding Cookie: " + tmp.toString());
+        }
+        webSocketClient.setCookieStore(cookies);                
         webSocketClient.connect(socket, uri, request);
         
         //Get connection timeout or use the default value
@@ -494,6 +505,21 @@ public class WebSocketSampler extends AbstractSampler implements TestStateListen
             socket.close();
         }
     }
+    public CookieStore getCookieStore(URI uri) {
+        CookieStore myCookies = new HttpCookieStore();
+        JMeterVariables variables = this.getThreadContext().getVariables();
+        Iterator<Map.Entry<String, Object>> itr = variables.getIterator();
+        while (itr.hasNext()) {
+            Map.Entry<String, Object> element = itr.next();
+            if (element.getKey().startsWith("COOKIE_")) {
+                String cName = element.getKey().split("_", 2)[1];
+                HttpCookie tmpCookie = new HttpCookie(cName,element.getValue().toString());
+                log.info("Adding Cookie: " + cName + "=" + element.getValue());
+                myCookies.add(uri, tmpCookie);
+            }
+        }
+        return myCookies;
+    }    
 
 
 
