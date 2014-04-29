@@ -74,14 +74,14 @@ public class WebSocketSampler extends AbstractSampler implements TestStateListen
         if (isStreamingConnection()) {
              if (connectionList.containsKey(connectionId)) {
                  socket = connectionList.get(connectionId);
-                 socket.initialize();
+                 socket.initialize(this);
                  return socket;
              } else {
-                socket = new ServiceSocket(this, webSocketClient);
+                socket = new ServiceSocket(this, webSocketClient, connectionId);
                 connectionList.put(connectionId, socket);
              }
         } else {
-            socket = new ServiceSocket(this, webSocketClient);
+            socket = new ServiceSocket(this, webSocketClient, connectionId);
         }
 
         //Start WebSocket client thread and upgrage HTTP connection
@@ -127,7 +127,7 @@ public class WebSocketSampler extends AbstractSampler implements TestStateListen
         String payloadMessage = getRequestPayload();
         sampleResult.setSamplerData(payloadMessage);
         
-        //Could improve precission by moving this closer to the action
+        //Could improve precision by moving this closer to the action
         sampleResult.sampleStart();
 
         try {

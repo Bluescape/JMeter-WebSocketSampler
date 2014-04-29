@@ -1,6 +1,6 @@
 /*
  * To change this template, choose Tools | Templates
- * and open the template in the editor.
+ * and open the template in the editor. 
  */
 package JMeter.plugins.functional.samplers.websocket;
 
@@ -29,7 +29,7 @@ import org.eclipse.jetty.websocket.client.WebSocketClient;
 @WebSocket(maxTextMessageSize = 256 * 1024 * 1024)
 public class ServiceSocket {
 
-    protected final WebSocketSampler parent;
+    protected WebSocketSampler parent;
     protected WebSocketClient client;
     private static final Logger log = LoggingManager.getLoggerForClass();
     protected Deque<String> responeBacklog = new LinkedList<String>();
@@ -44,14 +44,14 @@ public class ServiceSocket {
     protected Pattern responseExpression;
     protected Pattern disconnectExpression;
     protected boolean connected = false;
+    protected boolean disconnect = false;
+    protected boolean foundResponse = false;
+    protected String connectionId = "";
 
-    public ServiceSocket(WebSocketSampler parent, WebSocketClient client) {
+    public ServiceSocket(WebSocketSampler parent, WebSocketClient client, String connectionId) {
         this.parent = parent;
         this.client = client;
-        
-        //Evaluate response matching patterns in case thay contain JMeter variables (i.e. ${var})
-        responsePattern = new CompoundVariable(parent.getResponsePattern()).execute();
-        disconnectPattern = new CompoundVariable(parent.getCloseConncectionPattern()).execute();
+        this.connectionId = connectionId;
         logMessage.append("\n\n[Execution Flow]\n");
         logMessage.append(" - Opening new connection\n");
         initializePatterns();
@@ -61,19 +61,22 @@ public class ServiceSocket {
     public void onMessage(String msg) {
         synchronized (parent) {
             log.debug("Received message: " + msg);
-            String length = " (" + msg.length() + " bytes)";
-            logMessage.append(" - Received message #").append(messageCounter).append(length);
-            addResponseMessage("[Message " + (messageCounter++) + "]\n" + msg + "\n\n");
-
-            if (responseExpression == null || responseExpression.matcher(msg).find()) {
-                logMessage.append("; matched response pattern").append("\n");
-                closeLatch.countDown();
-            } else if (!disconnectPattern.isEmpty() && disconnectExpression.matcher(msg).find()) {
-                logMessage.append("; matched connection close pattern").append("\n");
-                closeLatch.countDown();
-                close(StatusCode.NORMAL, "JMeter closed session.");
-            } else {
-                logMessage.append("; didn't match any pattern").append("\n");
+            if (!isDisconnect() && !foundResponse()) {
+	            String length = " (" + msg.length() + " bytes)";
+	            logMessage.append(" - Received message #").append(messageCounter).append(length);
+	            addResponseMessage("[cid:" + this.connectionId + " - Message " + (messageCounter++) + "]\n" + msg + "\n\n");
+	
+	            if (responseExpression == null || responseExpression.matcher(msg).find()) {
+	                logMessage.append("; matched response pattern").append("\n");
+	                setFoundResponse(true);
+	                closeLatch.countDown();
+	            } else if (!disconnectPattern.isEmpty() && disconnectExpression.matcher(msg).find()) {
+	                logMessage.append("; matched connection close pattern").append("\n");
+	                setDisconnect(true);
+	                closeLatch.countDown();
+	            } else {
+	                logMessage.append("; didn't match any pattern").append("\n");
+	            }
             }
         }
     }
@@ -113,7 +116,12 @@ public class ServiceSocket {
         //Iterate through response messages saved in the responeBacklog cache
         Iterator<String> iterator = responeBacklog.iterator();
         while (iterator.hasNext()) {
-            responseMessage += iterator.next();
+        	try {
+        		responseMessage += iterator.next();
+        	} catch (Exception e) {
+        		log.warn("Last response message is null - continuing");
+        		break;
+        	}
         }
 
         return responseMessage;
@@ -123,7 +131,7 @@ public class ServiceSocket {
         logMessage.append(" - Waiting for messages for ").append(duration).append(" ").append(unit.toString()).append("\n");
         boolean res = this.closeLatch.await(duration, unit);
 
-        if (!parent.isStreamingConnection()) {
+        if (!parent.isStreamingConnection() || isDisconnect()) {
             close(StatusCode.NORMAL, "JMeter closed session.");
         } else {
             logMessage.append(" - Leaving streaming connection open").append("\n");
@@ -153,6 +161,7 @@ public class ServiceSocket {
     }
 
     public void sendMessage(String message) throws IOException {
+        setFoundResponse(false);
         session.getRemote().sendString(message);
     }
 
@@ -201,6 +210,9 @@ public class ServiceSocket {
     }
 
     protected void initializePatterns() {
+        //Evaluate response matching patterns in case thay contain JMeter variables (i.e. ${var})
+        responsePattern = new CompoundVariable(parent.getResponsePattern()).execute();
+        disconnectPattern = new CompoundVariable(parent.getCloseConncectionPattern()).execute();
         try {
             logMessage.append(" - Using response message pattern \"").append(responsePattern).append("\"\n");
             responseExpression = (responsePattern != null || !responsePattern.isEmpty()) ? Pattern.compile(responsePattern) : null;
@@ -228,13 +240,15 @@ public class ServiceSocket {
         return connected;
     }
 
-    public void initialize() {
+    public void initialize(WebSocketSampler parent) {
+    	this.parent = parent;
         logMessage = new StringBuffer();
         logMessage.append("\n\n[Execution Flow]\n");
         logMessage.append(" - Reusing exising connection\n");
         error = 0;
-
+        initializePatterns();
         this.closeLatch = new CountDownLatch(1);
+
     }
 
     private void addResponseMessage(String message) {
@@ -251,4 +265,20 @@ public class ServiceSocket {
         }
         responeBacklog.add(message);
     }
+
+	public boolean isDisconnect() {
+		return disconnect;
+	}
+
+	public void setDisconnect(boolean disconnect) {
+		this.disconnect = disconnect;
+	}
+
+	protected boolean foundResponse() {
+		return foundResponse;
+	}
+
+	protected void setFoundResponse(boolean foundResponse) {
+		this.foundResponse = foundResponse;
+	}
 }
