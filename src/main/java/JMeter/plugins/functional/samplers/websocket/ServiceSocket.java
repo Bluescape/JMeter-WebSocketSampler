@@ -63,12 +63,11 @@ public class ServiceSocket {
             log.debug("Received message: " + msg);
             if (!isDisconnect() && !foundResponse()) {
 	            String length = " (" + msg.length() + " bytes)";
-	            logMessage.append(" - Received message #").append(messageCounter).append(length);
-	            addResponseMessage("[cid:" + this.connectionId + " - Message " + (messageCounter++) + "]\n" + msg + "\n\n");
-	
+	            logMessage.append(" - Received message #").append(messageCounter).append(length).append(msg);
 	            if (responseExpression == null || responseExpression.matcher(msg).find()) {
 	                logMessage.append("; matched response pattern").append("\n");
-	                setFoundResponse(true);
+                    addResponseMessage("[cid:" + this.connectionId + " - Message " + (messageCounter++) + "]\n" + msg + "\n\n");
+                    setFoundResponse(true);
 	                closeLatch.countDown();
 	            } else if (!disconnectPattern.isEmpty() && disconnectExpression.matcher(msg).find()) {
 	                logMessage.append("; matched connection close pattern").append("\n");
@@ -242,6 +241,8 @@ public class ServiceSocket {
 
     public void initialize(WebSocketSampler parent) {
     	this.parent = parent;
+        responeBacklog = new LinkedList<String>();
+        messageCounter = 1;
         logMessage = new StringBuffer();
         logMessage.append("\n\n[Execution Flow]\n");
         logMessage.append(" - Reusing exising connection\n");
