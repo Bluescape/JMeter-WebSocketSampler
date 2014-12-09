@@ -5,7 +5,6 @@
 package JMeter.plugins.functional.samplers.websocket;
 
 import java.io.IOException;
-import java.util.Deque;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.concurrent.CountDownLatch;
@@ -21,6 +20,8 @@ import org.eclipse.jetty.websocket.api.annotations.OnWebSocketConnect;
 import org.eclipse.jetty.websocket.api.annotations.OnWebSocketMessage;
 import org.eclipse.jetty.websocket.api.annotations.WebSocket;
 import org.eclipse.jetty.websocket.client.WebSocketClient;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.Queue;
 
 /**
  *
@@ -32,7 +33,7 @@ public class ServiceSocket {
     protected WebSocketSampler parent;
     protected WebSocketClient client;
     private static final Logger log = LoggingManager.getLoggerForClass();
-    protected Deque<String> responeBacklog = new LinkedList<String>();
+    protected Queue<String> responeBacklog = new ConcurrentLinkedQueue<String>();
     protected Integer error = 0;
     protected StringBuffer logMessage = new StringBuffer();
     protected CountDownLatch openLatch = new CountDownLatch(1);
@@ -63,10 +64,12 @@ public class ServiceSocket {
             log.debug("Received message: " + msg);
             if (!isDisconnect() && !foundResponse()) {
 	            String length = " (" + msg.length() + " bytes)";
-	            logMessage.append(" - Received message #").append(messageCounter).append(length).append(msg);
+	            
+                logMessage.append(" - Received message #").append(messageCounter++).append(length).append(msg);
+                
 	            if (responseExpression == null || responseExpression.matcher(msg).find()) {
 	                logMessage.append("; matched response pattern").append("\n");
-                    addResponseMessage("[cid:" + this.connectionId + " - Message " + (messageCounter++) + "]\n" + msg + "\n\n");
+                    addResponseMessage("[cid:" + this.connectionId + " - Message " + (messageCounter) + "]\n" + msg + "\n\n");
                     setFoundResponse(true);
 	                closeLatch.countDown();
 	            } else if (!disconnectPattern.isEmpty() && disconnectExpression.matcher(msg).find()) {
