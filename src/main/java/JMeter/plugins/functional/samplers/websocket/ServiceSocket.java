@@ -69,7 +69,8 @@ public class ServiceSocket {
                 
 	            if (responseExpression == null || responseExpression.matcher(msg).find()) {
 	                logMessage.append("; matched response pattern").append("\n");
-                    addResponseMessage("[cid:" + this.connectionId + " - Message " + (messageCounter) + "]\n" + msg + "\n\n");
+                    //addResponseMessage("[cid:" + this.connectionId + " - Message " + (messageCounter) + "]\n" + msg + "\n\n");
+                    addResponseMessage(msg);
                     setFoundResponse(true);
 	                closeLatch.countDown();
 	            } else if (!disconnectPattern.isEmpty() && disconnectExpression.matcher(msg).find()) {
