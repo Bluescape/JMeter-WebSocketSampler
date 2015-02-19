@@ -5,7 +5,6 @@
 package JMeter.plugins.functional.samplers.websocket;
 
 import java.io.IOException;
-import java.util.Deque;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.concurrent.CountDownLatch;
@@ -21,6 +20,8 @@ import org.eclipse.jetty.websocket.api.annotations.OnWebSocketConnect;
 import org.eclipse.jetty.websocket.api.annotations.OnWebSocketMessage;
 import org.eclipse.jetty.websocket.api.annotations.WebSocket;
 import org.eclipse.jetty.websocket.client.WebSocketClient;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.Queue;
 
 /**
  *
@@ -32,7 +33,7 @@ public class ServiceSocket {
     protected WebSocketSampler parent;
     protected WebSocketClient client;
     private static final Logger log = LoggingManager.getLoggerForClass();
-    protected Deque<String> responeBacklog = new LinkedList<String>();
+    protected Queue<String> responeBacklog = new ConcurrentLinkedQueue<String>();
     protected Integer error = 0;
     protected StringBuffer logMessage = new StringBuffer();
     protected CountDownLatch openLatch = new CountDownLatch(1);
@@ -63,12 +64,14 @@ public class ServiceSocket {
             log.debug("Received message: " + msg);
             if (!isDisconnect() && !foundResponse()) {
 	            String length = " (" + msg.length() + " bytes)";
-	            logMessage.append(" - Received message #").append(messageCounter).append(length);
-	            addResponseMessage("[cid:" + this.connectionId + " - Message " + (messageCounter++) + "]\n" + msg + "\n\n");
-	
+	            
+                logMessage.append(" - Received message #").append(messageCounter++).append(length).append(msg);
+                
 	            if (responseExpression == null || responseExpression.matcher(msg).find()) {
 	                logMessage.append("; matched response pattern").append("\n");
-	                setFoundResponse(true);
+                    //addResponseMessage("[cid:" + this.connectionId + " - Message " + (messageCounter) + "]\n" + msg + "\n\n");
+                    addResponseMessage(msg);
+                    setFoundResponse(true);
 	                closeLatch.countDown();
 	            } else if (!disconnectPattern.isEmpty() && disconnectExpression.matcher(msg).find()) {
 	                logMessage.append("; matched connection close pattern").append("\n");
@@ -242,6 +245,8 @@ public class ServiceSocket {
 
     public void initialize(WebSocketSampler parent) {
     	this.parent = parent;
+        responeBacklog = new LinkedList<String>();
+        messageCounter = 1;
         logMessage = new StringBuffer();
         logMessage.append("\n\n[Execution Flow]\n");
         logMessage.append(" - Reusing exising connection\n");
