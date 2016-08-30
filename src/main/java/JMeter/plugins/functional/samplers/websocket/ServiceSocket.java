@@ -33,7 +33,7 @@ public class ServiceSocket {
     protected WebSocketSampler parent;
     protected WebSocketClient client;
     private static final Logger log = LoggingManager.getLoggerForClass();
-    protected Queue<String> responeBacklog = new ConcurrentLinkedQueue<String>();
+    protected Queue<String> responseBacklog = new ConcurrentLinkedQueue<String>();
     protected Integer error = 0;
     protected StringBuffer logMessage = new StringBuffer();
     protected CountDownLatch openLatch = new CountDownLatch(1);
@@ -111,13 +111,13 @@ public class ServiceSocket {
     }
 
     /**
-     * @return response message made of messages saved in the responeBacklog cache
+     * @return response message made of messages saved in the responseBacklog cache
      */
     public String getResponseMessage() {
         String responseMessage = "";
         
-        //Iterate through response messages saved in the responeBacklog cache
-        Iterator<String> iterator = responeBacklog.iterator();
+        //Iterate through response messages saved in the responseBacklog cache
+        Iterator<String> iterator = responseBacklog.iterator();
         while (iterator.hasNext()) {
         	try {
         		responseMessage += iterator.next();
@@ -245,7 +245,7 @@ public class ServiceSocket {
 
     public void initialize(WebSocketSampler parent) {
     	this.parent = parent;
-        responeBacklog = new LinkedList<String>();
+        responseBacklog = new LinkedList<String>();
         messageCounter = 1;
         logMessage = new StringBuffer();
         logMessage.append("\n\n[Execution Flow]\n");
@@ -265,10 +265,10 @@ public class ServiceSocket {
             messageBacklog = WebSocketSampler.MESSAGE_BACKLOG_COUNT;
         }
 
-        while (responeBacklog.size() >= messageBacklog) {
-            responeBacklog.poll();
+        while (responseBacklog.size() >= messageBacklog) {
+            responseBacklog.poll();
         }
-        responeBacklog.add(message);
+        responseBacklog.add(message);
     }
 
 	public boolean isDisconnect() {
